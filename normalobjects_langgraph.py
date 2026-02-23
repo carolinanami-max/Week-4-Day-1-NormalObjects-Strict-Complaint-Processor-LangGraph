@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 from typing import TypedDict, List
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,7 +31,7 @@ class ComplaintState(TypedDict):
     status: str  # Current status (intake, validate, investigate, resolve, close)
     timestamp: str  # When complaint was closed
 
-    # NODE 1: Intake - Parse and categorize the complaint
+# NODE 1: Intake - Parse and categorize the complaint
 def intake_node(state: ComplaintState) -> ComplaintState:
     """
     Step 1: The receptionist - reads complaint and decides category
@@ -74,7 +75,6 @@ def intake_node(state: ComplaintState) -> ComplaintState:
     }
     
     return new_state
-
 
 # NODE 2: Validation - Check complaint against Bloyce's strict rules
 def validate_node(state: ComplaintState) -> ComplaintState:
@@ -266,7 +266,6 @@ def resolve_node(state: ComplaintState) -> ComplaintState:
     
     return new_state
 
-
 # NODE 5: Closure - Confirm resolution and check satisfaction
 def close_node(state: ComplaintState) -> ComplaintState:
     """
@@ -279,8 +278,6 @@ def close_node(state: ComplaintState) -> ComplaintState:
     category = state["category"]
     resolution = state["resolution"]
     rating = state["effectiveness_rating"]
-    
-    from datetime import datetime
     
     # Create closure prompt
     closure_prompt = f"""
@@ -339,52 +336,6 @@ def close_node(state: ComplaintState) -> ComplaintState:
     print("="*50)
     
     return new_state
-
-# STEP 3: Build the Graph - Connect all nodes into a workflow
-from langgraph.graph import StateGraph, END
-
-
-def build_complaint_graph():
-    """
-    Build the workflow graph connecting all nodes
-    """
-    print("Building Bloyce's Protocol workflow...")
-    
-    # Create the graph with our state structure
-    workflow = StateGraph(ComplaintState)
-    
-    # Add all nodes (workstations)
-    workflow.add_node("intake", intake_node)
-    workflow.add_node("validate", validate_node)
-    workflow.add_node("investigate", investigate_node)
-    workflow.add_node("resolve", resolve_node)
-    workflow.add_node("close", close_node)
-    
-    print("✓ All nodes added to graph")
-    
-    # Define the entry point (where work starts)
-    workflow.set_entry_point("intake")
-    print("✓ Entry point set to 'intake'")
-    
-    # Add basic linear edges (conveyor belts)
-    # Intake always goes to validate
-    workflow.add_edge("intake", "validate")
-    print("✓ Added edge: intake → validate")
-    
-    # We'll add conditional routing for validation next
-    # For now, let's add the happy path for valid complaints
-    workflow.add_edge("investigate", "resolve")
-    workflow.add_edge("resolve", "close")
-    workflow.add_edge("close", END)
-    print("✓ Added edges: investigate → resolve → close → END")
-    
-    return workflow
-
-# ============================================
-# STEP 3: Build the Graph - Connect all nodes
-# ============================================
-
-from langgraph.graph import StateGraph, END
 
 # Conditional routing function - decides where to go after validation
 def route_after_validation(state: ComplaintState) -> str:
@@ -460,3 +411,114 @@ def build_complaint_graph():
     print("="*50)
     
     return app
+
+# STEP 5: Visualize Workflow Execution
+def visualize_workflow(workflow_path):
+    """
+    Create a simple visualization of the workflow path
+    """
+    print("\n" + "🎯 WORKFLOW VISUALIZATION")
+    print("="*40)
+    
+    # Define all possible steps
+    all_steps = ["intake", "validate", "investigate", "resolve", "close"]
+    
+    # Create a visual representation
+    visual = ""
+    for step in all_steps:
+        if step in workflow_path:
+            visual += f"✅ {step} → "
+        else:
+            visual += f"⬜ {step} → "
+    
+    # Remove the last arrow
+    visual = visual[:-3]
+    
+    print(visual)
+    
+    # Show path summary
+    print("\n📊 Path Summary:")
+    print(f"   Steps taken: {' → '.join(workflow_path)}")
+    print(f"   Total steps: {len(workflow_path)}")
+    if "investigate" not in workflow_path and "validate" in workflow_path:
+        print("   ⚠️  Note: Complaint was rejected at validation")
+    print("="*40)
+
+# STEP 4: Test the Workflow
+def test_complaint_processor():
+    """
+    Test the workflow with sample complaints
+    """
+    print("\n" + "="*50)
+    print("TESTING BLOYCE'S PROTOCOL")
+    print("="*50)
+    
+    # Build the graph
+    app = build_complaint_graph()
+    
+    # Sample complaints from the lab document
+    test_complaints = [
+        # Valid complaints (should go through full process)
+        "The Downside Up portal opens at different times each day. Sometimes it's 3pm, sometimes 8pm. How do I predict when?",
+        "Demogorgons sometimes work together and sometimes fight each other. What's their deal?",
+        "El can move things with her mind but can't lift heavy rocks. Why the limitation?",
+        
+        # Should be invalid (too vague)
+        "The portal is weird and I don't like it.",
+        
+        # Other category - automatically invalid per rules
+        "I found a strange coin in my backyard."
+    ]
+    
+    # Process each complaint
+    for i, complaint in enumerate(test_complaints, 1):
+        print("\n" + "#"*60)
+        print(f"TEST CASE {i}: Processing complaint...")
+        print("#"*60)
+        print(f"Complaint: {complaint}")
+        
+        # Initial state
+        initial_state = {
+            "complaint": complaint,
+            "category": "",
+            "is_valid": False,
+            "validation_message": "",
+            "evidence": "",
+            "resolution": "",
+            "effectiveness_rating": "",
+            "customer_satisfied": False,
+            "workflow_path": [],
+            "status": "start",
+            "timestamp": ""
+        }
+        
+        # Run the workflow
+        try:
+            final_state = app.invoke(initial_state)
+            
+            print("\n" + "-"*40)
+            print("FINAL RESULT:")
+            print("-"*40)
+            print(f"Category: {final_state.get('category', 'N/A')}")
+            print(f"Valid: {final_state.get('is_valid', False)}")
+            if not final_state.get('is_valid', False):
+                print(f"Validation Message: {final_state.get('validation_message', 'No message')}")
+            print(f"Effectiveness Rating: {final_state.get('effectiveness_rating', 'N/A')}")
+            print(f"Status: {final_state.get('status', 'N/A')}")
+            
+            # Add visualization
+            visualize_workflow(final_state.get('workflow_path', []))
+            
+        except Exception as e:
+            print(f"Error processing complaint: {e}")
+        
+        if i < len(test_complaints):
+            input("\nPress Enter to continue to next test case...")
+        else:
+            print("\n" + "="*50)
+            print("ALL TEST CASES COMPLETED!")
+            print("="*50)
+
+# Run the tests
+if __name__ == "__main__":
+    test_complaint_processor()
