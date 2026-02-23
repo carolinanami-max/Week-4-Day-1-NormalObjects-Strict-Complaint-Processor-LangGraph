@@ -200,3 +200,68 @@ def investigate_node(state: ComplaintState) -> ComplaintState:
     }
     
     return new_state
+
+# NODE 4: Resolution - Propose a fix based on evidence
+def resolve_node(state: ComplaintState) -> ComplaintState:
+    """
+    Step 4: Problem solver - proposes solution based on evidence
+    """
+    print("\n" + "="*50)
+    print("[RESOLVE] Proposing resolution...")
+    print("="*50)
+    
+    category = state["category"]
+    complaint = state["complaint"]
+    evidence = state["evidence"]
+    
+    # Create resolution prompt
+    resolution_prompt = f"""
+    You are a Downside Up resolution specialist. Propose a solution for this {category} complaint.
+    
+    Complaint: {complaint}
+    
+    Investigation Evidence: {evidence}
+    
+    Bloyce's Protocol Resolution Rules:
+    
+    1. Resolutions must be specific to {category} complaint type
+    2. Must reference established Downside Up procedures or protocols
+    3. Environmental or monster complaints MAY require escalation to specialized teams
+    4. Each resolution MUST include an effectiveness rating: high, medium, or low
+    
+    Format your response exactly like this:
+    
+    Resolution: [Your proposed solution]
+    
+    Effectiveness Rating: [high/medium/low]
+    
+    Specialized Team Needed: [yes/no] - Only yes for environmental or monster if needed
+    
+    Explanation: [Brief explanation of why this solution fits the evidence]
+    """
+    
+    # Ask the AI for resolution
+    response = llm.invoke([HumanMessage(content=resolution_prompt)])
+    resolution_text = response.content.strip()
+    
+    # Parse the response to extract rating
+    lines = resolution_text.split('\n')
+    rating = "medium"  # default
+    for line in lines:
+        if "Effectiveness Rating:" in line:
+            rating = line.replace("Effectiveness Rating:", "").strip().lower()
+            break
+    
+    print(f"[RESOLVE] Proposed solution with {rating} effectiveness rating")
+    print(f"[RESOLVE] First line: {lines[0] if lines else 'No resolution provided'}")
+    
+    # Update the state
+    new_state = {
+        **state,
+        "resolution": resolution_text,
+        "effectiveness_rating": rating,
+        "workflow_path": state.get("workflow_path", []) + ["resolve"],
+        "status": "resolve"
+    }
+    
+    return new_state
