@@ -343,6 +343,7 @@ def close_node(state: ComplaintState) -> ComplaintState:
 # STEP 3: Build the Graph - Connect all nodes into a workflow
 from langgraph.graph import StateGraph, END
 
+
 def build_complaint_graph():
     """
     Build the workflow graph connecting all nodes
@@ -378,3 +379,84 @@ def build_complaint_graph():
     print("✓ Added edges: investigate → resolve → close → END")
     
     return workflow
+
+# ============================================
+# STEP 3: Build the Graph - Connect all nodes
+# ============================================
+
+from langgraph.graph import StateGraph, END
+
+# Conditional routing function - decides where to go after validation
+def route_after_validation(state: ComplaintState) -> str:
+    """
+    Decision point: Based on validation result, either:
+    - Investigate (if valid)
+    - Close with rejection (if invalid)
+    """
+    print("\n" + "="*50)
+    print("[ROUTER] Checking validation result...")
+    print("="*50)
+    
+    if state.get("is_valid", False):
+        print("[ROUTER] Complaint is VALID → proceeding to investigation")
+        return "investigate"
+    else:
+        print("[ROUTER] Complaint is INVALID → sending to closure with rejection")
+        return "close"
+
+# Function to build the workflow graph
+def build_complaint_graph():
+    """
+    Build the workflow graph connecting all nodes
+    """
+    print("Building Bloyce's Protocol workflow...")
+    
+    # Create the graph with our state structure
+    workflow = StateGraph(ComplaintState)
+    
+    # Add all nodes (workstations)
+    workflow.add_node("intake", intake_node)
+    workflow.add_node("validate", validate_node)
+    workflow.add_node("investigate", investigate_node)
+    workflow.add_node("resolve", resolve_node)
+    workflow.add_node("close", close_node)
+    
+    print("✓ All nodes added to graph")
+    
+    # Define the entry point (where work starts)
+    workflow.set_entry_point("intake")
+    print("✓ Entry point set to 'intake'")
+    
+    # Add edges
+    # Intake always goes to validate
+    workflow.add_edge("intake", "validate")
+    print("✓ Added edge: intake → validate")
+    
+    # CONDITIONAL EDGE: After validate, router decides next step
+    workflow.add_conditional_edges(
+        "validate",
+        route_after_validation,
+        {
+            "investigate": "investigate",
+            "close": "close"
+        }
+    )
+    print("✓ Added conditional edge: validate → [investigate OR close]")
+    
+    # Happy path for valid complaints
+    workflow.add_edge("investigate", "resolve")
+    workflow.add_edge("resolve", "close")
+    print("✓ Added edges: investigate → resolve → close")
+    
+    # Close always goes to end
+    workflow.add_edge("close", END)
+    print("✓ Added edge: close → END")
+    
+    # Compile the graph
+    app = workflow.compile()
+    print("✓ Graph compiled successfully!")
+    print("\n" + "="*50)
+    print("BLOYCE'S PROTOCOL IS READY")
+    print("="*50)
+    
+    return app
