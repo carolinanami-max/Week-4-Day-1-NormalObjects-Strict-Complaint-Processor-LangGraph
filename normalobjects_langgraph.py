@@ -74,3 +74,129 @@ def intake_node(state: ComplaintState) -> ComplaintState:
     }
     
     return new_state
+
+
+# NODE 2: Validation - Check complaint against Bloyce's strict rules
+def validate_node(state: ComplaintState) -> ComplaintState:
+    """
+    Step 2: Security guard - checks if complaint follows the rules
+    """
+    print("\n" + "="*50)
+    print("[VALIDATE] Checking complaint against Bloyce's Protocol...")
+    print("="*50)
+    
+    category = state["category"]
+    complaint = state["complaint"]
+    
+    # Create a validation prompt based on the category rules from the lab
+    validation_prompt = f"""
+    You are Bloyce's strict complaint validator. Check if this complaint follows these rules:
+    
+    Category: {category}
+    Complaint: {complaint}
+    
+    Validation rules from Bloyce's Protocol:
+    
+    1. PORTAL complaints (category: portal):
+       - Must reference specific location OR timing anomalies
+       - Example: "portal opens at different times" → VALID
+       - Example: "portal location changed" → VALID
+       - Example: "portal is weird" → INVALID (too vague)
+    
+    2. MONSTER complaints (category: monster):
+       - Must describe creature behavior or interactions
+       - Example: "demogorgons fight each other" → VALID
+       - Example: "creature appeared" → INVALID (no behavior described)
+    
+    3. PSYCHIC complaints (category: psychic):
+       - Must reference specific ability limitations or malfunctions
+       - Example: "can't lift heavy rocks" → VALID
+       - Example: "powers are weird" → INVALID (too vague)
+    
+    4. ENVIRONMENTAL complaints (category: environmental):
+       - Must mention electricity, weather, or observable physical phenomena
+       - Example: "power lines react strangely" → VALID
+       - Example: "weather is bad" → INVALID (too vague)
+    
+    5. OTHER complaints (category: other):
+       - Automatically INVALID (requires manual review)
+    
+    Return your response in this exact format:
+    Valid: [YES/NO]
+    Message: [Brief explanation following the rules]
+    """
+    
+    # Ask the AI to validate
+    response = llm.invoke([HumanMessage(content=validation_prompt)])
+    result = response.content.strip()
+    
+    # Parse the response
+    lines = result.split('\n')
+    is_valid = 'YES' in lines[0].upper()
+    validation_message = lines[1].replace('Message:', '').strip() if len(lines) > 1 else "No message provided"
+    
+    print(f"[VALIDATE] Valid: {is_valid}")
+    print(f"[VALIDATE] Message: {validation_message}")
+    
+    # Update the state
+    new_state = {
+        **state,
+        "is_valid": is_valid,
+        "validation_message": validation_message,
+        "workflow_path": state.get("workflow_path", []) + ["validate"],
+        "status": "validate"
+    }
+    
+    return new_state
+
+# NODE 3: Investigation - Gather evidence based on complaint type
+def investigate_node(state: ComplaintState) -> ComplaintState:
+    """
+    Step 3: Detective - gathers evidence before proposing solution
+    Only runs if complaint is valid
+    """
+    print("\n" + "="*50)
+    print("[INVESTIGATE] Gathering evidence...")
+    print("="*50)
+    
+    category = state["category"]
+    complaint = state["complaint"]
+    
+    # Create investigation prompt based on category
+    investigation_prompt = f"""
+    You are a Downside Up investigator. Gather evidence for this {category} complaint.
+    
+    Complaint: {complaint}
+    
+    Based on Bloyce's Protocol, investigate according to these rules:
+    
+    - PORTAL issues: Investigate temporal patterns, location consistency, and environmental factors
+    - MONSTER issues: Gather behavioral data, interaction patterns, and environmental triggers
+    - PSYCHIC issues: Document ability specifications, tested limitations, and contextual factors
+    - ENVIRONMENTAL issues: Analyze power line activity, atmospheric conditions, and anomaly correlation
+    - OTHER issues: Note that these require manual review
+    
+    Provide a detailed investigation report with:
+    1. Key findings (what did you discover?)
+    2. Evidence gathered (specific observations)
+    3. Patterns identified (if any)
+    
+    Keep the report concise but professional.
+    """
+    
+    # Ask the AI to investigate
+    response = llm.invoke([HumanMessage(content=investigation_prompt)])
+    evidence = response.content.strip()
+    
+    print(f"[INVESTIGATE] Evidence gathered:")
+    print(f"{evidence[:200]}...")  # Show first 200 chars only
+    
+    # Update the state
+    new_state = {
+        **state,
+        "evidence": evidence,
+        "workflow_path": state.get("workflow_path", []) + ["investigate"],
+        "status": "investigate"
+    }
+    
+    return new_state
