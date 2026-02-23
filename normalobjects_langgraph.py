@@ -339,3 +339,42 @@ def close_node(state: ComplaintState) -> ComplaintState:
     print("="*50)
     
     return new_state
+
+# STEP 3: Build the Graph - Connect all nodes into a workflow
+from langgraph.graph import StateGraph, END
+
+def build_complaint_graph():
+    """
+    Build the workflow graph connecting all nodes
+    """
+    print("Building Bloyce's Protocol workflow...")
+    
+    # Create the graph with our state structure
+    workflow = StateGraph(ComplaintState)
+    
+    # Add all nodes (workstations)
+    workflow.add_node("intake", intake_node)
+    workflow.add_node("validate", validate_node)
+    workflow.add_node("investigate", investigate_node)
+    workflow.add_node("resolve", resolve_node)
+    workflow.add_node("close", close_node)
+    
+    print("✓ All nodes added to graph")
+    
+    # Define the entry point (where work starts)
+    workflow.set_entry_point("intake")
+    print("✓ Entry point set to 'intake'")
+    
+    # Add basic linear edges (conveyor belts)
+    # Intake always goes to validate
+    workflow.add_edge("intake", "validate")
+    print("✓ Added edge: intake → validate")
+    
+    # We'll add conditional routing for validation next
+    # For now, let's add the happy path for valid complaints
+    workflow.add_edge("investigate", "resolve")
+    workflow.add_edge("resolve", "close")
+    workflow.add_edge("close", END)
+    print("✓ Added edges: investigate → resolve → close → END")
+    
+    return workflow
