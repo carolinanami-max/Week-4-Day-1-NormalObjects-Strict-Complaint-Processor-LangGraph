@@ -265,3 +265,77 @@ def resolve_node(state: ComplaintState) -> ComplaintState:
     }
     
     return new_state
+
+
+# NODE 5: Closure - Confirm resolution and check satisfaction
+def close_node(state: ComplaintState) -> ComplaintState:
+    """
+    Step 5: Customer service - confirms resolution and checks satisfaction
+    """
+    print("\n" + "="*50)
+    print("[CLOSE] Finalizing complaint...")
+    print("="*50)
+    
+    category = state["category"]
+    resolution = state["resolution"]
+    rating = state["effectiveness_rating"]
+    
+    from datetime import datetime
+    
+    # Create closure prompt
+    closure_prompt = f"""
+    You are a Downside Up closure specialist. Finalize this {category} complaint.
+    
+    Resolution applied: {resolution}
+    Effectiveness rating: {rating}
+    
+    Bloyce's Protocol Closure Rules:
+    
+    1. Confirm the resolution was applied
+    2. Attempt customer satisfaction verification
+    3. Note if this needs 30-day follow-up (low effectiveness ratings require this)
+    
+    Format your response exactly like this:
+    
+    Resolution Confirmed: [yes/no]
+    
+    Customer Satisfaction: [satisfied/unsatisfied/attempted but no response]
+    
+    Thirty Day Follow-up Needed: [yes/no] - yes if effectiveness rating is "low"
+    
+    Closing Notes: [Brief final notes]
+    """
+    
+    # Ask the AI for closure
+    response = llm.invoke([HumanMessage(content=closure_prompt)])
+    closure_text = response.content.strip()
+    
+    # Check if follow-up is needed based on rating
+    follow_up_needed = rating == "low"
+    
+    # Get current timestamp
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    print(f"[CLOSE] Complaint closed at {current_time}")
+    print(f"[CLOSE] 30-day follow-up needed: {follow_up_needed}")
+    
+    # Update the state
+    new_state = {
+        **state,
+        "customer_satisfied": "satisfied" in closure_text.lower(),
+        "timestamp": current_time,
+        "workflow_path": state.get("workflow_path", []) + ["close"],
+        "status": "closed"
+    }
+    
+    # Print summary
+    print("\n" + "="*50)
+    print("COMPLAINT PROCESSING COMPLETE")
+    print("="*50)
+    print(f"Category: {category}")
+    print(f"Effectiveness Rating: {rating}")
+    print(f"30-day Follow-up: {'YES' if follow_up_needed else 'NO'}")
+    print(f"Workflow Path: {' → '.join(state.get('workflow_path', []) + ['close'])}")
+    print("="*50)
+    
+    return new_state
